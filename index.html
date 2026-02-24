@@ -21,6 +21,57 @@
             color: white;
             overflow-x: hidden;
         }
+        .name-input-section {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255,255,255,0.95);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            text-align: center;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            color: black;
+        }
+        .name-input-section.hidden {
+            display: none;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .input-group label {
+            font-weight: bold;
+            font-size: 18px;
+        }
+        .input-group input {
+            padding: 12px;
+            font-size: 18px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            width: 250px;
+        }
+        .name-btn {
+            padding: 15px 40px;
+            font-size: 20px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            background: #4CAF50;
+            color: white;
+            min-width: 200px;
+        }
+        .name-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        }
         .header {
             width: 90%;
             max-width: 800px;
@@ -37,13 +88,17 @@
             align-items: center;
             gap: 5px;
         }
+        .player-name {
+            font-size: 20px;
+            margin-bottom: 5px;
+        }
+        #player1 { color: red; }
+        #player2 { color: white; }
         .timer {
             font-size: 20px;
             font-weight: bold;
             min-width: 60px;
         }
-        #player1 { color: red; }
-        #player2 { color: white; }
         .game-container {
             position: relative;
             display: flex;
@@ -129,7 +184,6 @@
         }
         #startBtn { background: #4CAF50; color: white; font-size: 24px; }
         #restartBtn { background: #2196F3; color: white; }
-        #backBtn { background: #FF9800; color: white; }
         #gameOverMsg {
             position: absolute;
             top: 50%;
@@ -157,6 +211,7 @@
             display: flex;
             flex-direction: column;
             gap: 20px;
+            color: black;
         }
         .move-selector.hidden {
             display: none;
@@ -177,20 +232,34 @@
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="player-info">
-            <div>Player 1 (X)</div>
+    <!-- Player Names Input -->
+    <div id="nameInputSection" class="name-input-section">
+        <h2>Enter Player Names</h2>
+        <div class="input-group">
+            <label>Player 1 (X):</label>
+            <input type="text" id="player1Name" placeholder="Enter Player 1 name" maxlength="15">
+        </div>
+        <div class="input-group">
+            <label>Player 2 (O):</label>
+            <input type="text" id="player2Name" placeholder="Enter Player 2 name" maxlength="15">
+        </div>
+        <button class="name-btn" onclick="setPlayerNames()">Set Names & Start</button>
+    </div>
+
+    <div class="header" id="gameHeader" style="display: none;">
+        <div class="player-info" id="player1Info">
+            <div class="player-name" id="player1NameDisplay">Player 1</div>
             <div id="timer1" class="timer">00</div>
         </div>
         <h1 style="font-size: 32px;">XO GAME</h1>
-        <div class="player-info">
-            <div>Player 2 (O)</div>
+        <div class="player-info" id="player2Info">
+            <div class="player-name" id="player2NameDisplay">Player 2</div>
             <div id="timer2" class="timer">00</div>
         </div>
     </div>
 
     <div class="game-container">
-        <div id="moveSelector" class="move-selector">
+        <div id="moveSelector" class="move-selector hidden">
             <div class="status" id="selectorStatus">Select First Move</div>
             <button class="btn" onclick="selectFirstPlayer('X')">Player 1 First (X)</button>
             <button class="btn" onclick="selectFirstPlayer('O')">Player 2 First (O)</button>
@@ -213,7 +282,6 @@
         <div class="controls">
             <button id="startBtn" class="btn" onclick="startGame()" style="display: none;">Start Game</button>
             <button id="restartBtn" class="btn" onclick="restartGame()">Restart Game</button>
-            <button id="backBtn" class="btn" onclick="undoMove()" disabled>Back Move</button>
         </div>
     </div>
 
@@ -229,37 +297,47 @@
         const moveSelector = document.getElementById('moveSelector');
         const timer1 = document.getElementById('timer1');
         const timer2 = document.getElementById('timer2');
-        const backBtn = document.getElementById('backBtn');
         const tapSound = document.getElementById('tapSound');
+        const nameInputSection = document.getElementById('nameInputSection');
+        const gameHeader = document.getElementById('gameHeader');
 
         let currentPlayer = 'X';
         let gameBoard = ['', '', '', '', '', '', '', '', ''];
         let gameActive = false;
-        let moveHistory = [];
         let firstPlayer = null;
         let timerInterval;
         let timeLeft = 0;
         let isTimerRunning = false;
-        let currentMoveNumber = 0;
+        let moveCount = 0;
         const winPatterns = [
             [0,1,2], [3,4,5], [6,7,8],
             [0,3,6], [1,4,7], [2,5,8],
             [0,4,8], [2,4,6]
         ];
 
+        let player1Name = '';
+        let player2Name = '';
+
         boxes.forEach(box => {
             box.addEventListener('click', handleClick);
         });
 
-        function playSound() {
-            tapSound.currentTime = 0;
-            tapSound.play().catch(e => console.log('Sound play failed'));
+        function setPlayerNames() {
+            player1Name = document.getElementById('player1Name').value.trim() || 'Player 1';
+            player2Name = document.getElementById('player2Name').value.trim() || 'Player 2';
+            
+            document.getElementById('player1NameDisplay').textContent = player1Name.substring(0,1).toUpperCase();
+            document.getElementById('player2NameDisplay').textContent = player2Name.substring(0,1).toUpperCase();
+            
+            nameInputSection.classList.add('hidden');
+            gameHeader.style.display = 'flex';
+            moveSelector.classList.remove('hidden');
         }
 
         function selectFirstPlayer(player) {
             firstPlayer = player;
             currentPlayer = player;
-            document.getElementById('selectorStatus').innerText = `${player === 'X' ? 'Player 1' : 'Player 2'} starts first!`;
+            document.getElementById('selectorStatus').innerText = `${currentPlayer === 'X' ? player1Name : player2Name} starts first!`;
             startBtn.style.display = 'block';
             setTimeout(() => {
                 moveSelector.classList.add('hidden');
@@ -268,28 +346,35 @@
 
         function startGame() {
             gameActive = true;
-            currentMoveNumber = 0;
+            moveCount = 0;
             nextTurn();
         }
 
         function handleClick(e) {
             if (!gameActive || e.target.textContent !== '') return;
             
-            const index = e.target.dataset.index;
+            const index = parseInt(e.target.dataset.index);
             gameBoard[index] = currentPlayer;
             e.target.textContent = currentPlayer;
             e.target.classList.add(currentPlayer.toLowerCase());
             playSound();
             
-            moveHistory.push(index);
-            currentMoveNumber++;
+            moveCount++;
+            
+            // Fourth move ke baad first move remove karo (cycle every 3 moves after 3)
+            if (moveCount > 3 && moveCount % 3 === 1) {
+                const firstIndex = (moveCount - 4) % 9;
+                gameBoard[firstIndex] = '';
+                boxes[firstIndex].textContent = '';
+                boxes[firstIndex].className = 'box';
+            }
             
             if (checkWinner()) {
                 setTimeout(() => showWinner(currentPlayer), 500);
                 return;
             }
             
-            if (currentMoveNumber === 9) {
+            if (moveCount >= 9) {
                 showDraw();
                 return;
             }
@@ -304,8 +389,7 @@
 
         function nextTurn() {
             clearInterval(timerInterval);
-            const timeLimit = currentMoveNumber <= 1 ? 3 : 4;
-            timeLeft = timeLimit;
+            timeLeft = 10; // 10 seconds har move ke liye
             isTimerRunning = true;
             updateTimerDisplay();
             timerInterval = setInterval(() => {
@@ -330,7 +414,8 @@
 
         function opponentWins() {
             const winner = currentPlayer === 'X' ? 'O' : 'X';
-            showWinner(winner);
+            const winnerName = winner === 'X' ? player1Name : player2Name;
+            showWinner(winnerName);
         }
 
         function checkWinner() {
@@ -340,19 +425,12 @@
             });
         }
 
-        function showWinner(winner) {
+        function showWinner(winnerName) {
             gameActive = false;
             clearInterval(timerInterval);
-            gameOverMsg.textContent = `${winner} Wins! 🎉`;
+            gameOverMsg.innerHTML = `${winnerName} Wins! 🎉`;
             gameOverMsg.style.display = 'block';
             gameOverMsg.classList.add('winner-animation');
-            
-            // Highlight winning line (simplified)
-            boxes.forEach((box, i) => {
-                box.style.background = 'gold';
-            });
-            
-            backBtn.disabled = true;
         }
 
         function showDraw() {
@@ -360,48 +438,43 @@
             clearInterval(timerInterval);
             gameOverMsg.textContent = 'Draw!';
             gameOverMsg.style.display = 'block';
-            backBtn.disabled = true;
         }
 
         function restartGame() {
             gameActive = false;
             clearInterval(timerInterval);
             gameBoard = ['', '', '', '', '', '', '', '', ''];
-            moveHistory = [];
-            currentMoveNumber = 0;
+            moveCount = 0;
             boxes.forEach(box => {
                 box.textContent = '';
                 box.className = 'box';
                 box.style.background = 'rgba(255,255,255,0.9)';
             });
             gameOverMsg.style.display = 'none';
-            moveSelector.classList.remove('hidden');
+            nameInputSection.classList.remove('hidden');
+            gameHeader.style.display = 'none';
+            moveSelector.classList.add('hidden');
             startBtn.style.display = 'none';
-            backBtn.disabled = true;
             timer1.textContent = '00';
             timer2.textContent = '00';
-            currentPlayer = firstPlayer || 'X';
+            document.getElementById('player1Name').value = '';
+            document.getElementById('player2Name').value = '';
         }
 
-        function undoMove() {
-            if (moveHistory.length === 0 || !gameActive) return;
-            
-            const lastIndex = moveHistory.pop();
-            gameBoard[lastIndex] = '';
-            boxes[lastIndex].textContent = '';
-            boxes[lastIndex].className = 'box';
-            currentMoveNumber--;
-            
-            // Restore previous player
-            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
-            nextTurn();
-            
-            backBtn.disabled = moveHistory.length === 0;
+        function playSound() {
+            tapSound.currentTime = 0;
+            tapSound.play().catch(e => console.log('Sound play failed'));
         }
+
+        // Enter key support for name inputs
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !nameInputSection.classList.contains('hidden')) {
+                setPlayerNames();
+            }
+        });
 
         // Initial setup
-        moveSelector.classList.remove('hidden');
-        backBtn.disabled = true;
+        nameInputSection.classList.remove('hidden');
     </script>
 </body>
 </html>
